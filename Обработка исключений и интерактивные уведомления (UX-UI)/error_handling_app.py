@@ -70,17 +70,25 @@ class PartnerEditWindow(tk.Toplevel):
         phone = self.phone_entry.get().strip()
         rating_raw = self.rating_entry.get().strip()
 
+        
+        if not phone:
+            messagebox.showwarning(
+                "Предупреждение", 
+                "Вы не указали номер телефона!\nРекомендуется заполнить контактные данные для связи."
+            )
+            return
+
         if not name:
             messagebox.showerror(
                 "Ошибка ввода", 
-                "Поле 'Наименование партнера' не может быть пустым.\nПожалуйста, введите название компании и повторите попытку."
+                "Поле 'Наименование партнера' не может быть пустым."
             )
             return
 
         if not email or "@" not in email:
             messagebox.showerror(
                 "Ошибка ввода", 
-                "Поле 'Email' написано некорректно или отсутствует.\nПожалуйста, укажите верный адрес электронной почты."
+                "Поле 'Email' написано некорректно или отсутствует."
             )
             return
 
@@ -90,13 +98,12 @@ class PartnerEditWindow(tk.Toplevel):
                 raise ValueError("Рейтинг не может быть отрицательным")
         except ValueError:
             messagebox.showerror(
-                "Ошибка (Error)", 
-                "Рейтинг должен быть целым числом от 0.\nПожалуйста, удалите символы/знаки препинания и повторите попытку."
+                "Ошибка", 
+                "Рейтинг должен быть целым неотрицательным числом!"
             )
             return
 
-
-try:
+        try:
             cursor = self.conn.cursor()
             cursor.execute("""
                 INSERT INTO partners (type_name, name, email, phone, rating)
@@ -109,7 +116,7 @@ try:
             messagebox.showerror("Ошибка СУБД", f"Не удалось сохранить данные в БД:\n{str(e)}")
 
 
-if name == "__main__":
+if __name__ == "__main__":
     db = init_db()
     root = tk.Tk()
     root.withdraw()
