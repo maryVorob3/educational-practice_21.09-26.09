@@ -1,30 +1,48 @@
+import tkinter as tf
 import tkinter as tk
 from tkinter import ttk
 import sqlite3
+import os
 
 
 def init_db():
-    conn = sqlite3.connect(":memory:")
+    db_file = "partners_database.db"
+    if os.path.exists(db_file):
+        os.remove(db_file)
+        
+    conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
+
+    
+    cursor.execute("""
+        CREATE TABLE partner_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type_name TEXT NOT NULL UNIQUE
+        );
+    """)
+    cursor.executemany("INSERT INTO partner_types (type_name) VALUES (?);", [("ЗАО",), ("ООО",), ("ПАО",), ("ОАО",), ("ИП",)])
+
+    
     cursor.execute("""
         CREATE TABLE partners (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type_name TEXT NOT NULL,
+            type_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             director_name TEXT,
             email TEXT NOT NULL,
             phone TEXT NOT NULL,
             legal_address TEXT,
-            rating INTEGER DEFAULT 0
+            rating INTEGER DEFAULT 0,
+            FOREIGN KEY (type_id) REFERENCES partner_types(id)
         );
     """)
+    
     cursor.executemany("""
-        INSERT INTO partners (type_name, name, director_name, email, phone, legal_address, rating)
+        INSERT INTO partners (type_id, name, director_name, email, phone, legal_address, rating)
         VALUES (?, ?, ?, ?, ?, ?, ?);
     """, [
-        ("ЗАО", "База Строитель", "Иванова Светлана Сергеевна", "info@stroitel.ru", "+7 223 322 22 32", "г. Москва, ул. Ленина 5", 10),
-        ("ООО", "Паркет 29", "Петров Петр Петрович", "parket29@mail.ru", "+7 921 555 44 33", "г. СПб, ул. Мира 12", 15),
-        ("ПАО", "Стройкомплект", "Сидоров Алексей Владимирович", "stroy@corp.ru", "+7 905 111 22 33", "г. Казань, ул. Полевая 1", 8)
+        (1, "База Строитель", "Иванова Светлана", "info@stroitel.ru", "+7 223 322 22 32", "Москва", 10),
+        (2, "Паркет 29", "Петров Петр", "parket29@mail.ru", "+7 921 555 44 33", "СПб", 15)
     ])
     conn.commit()
     return conn
@@ -43,6 +61,8 @@ class PartnerEditWindow(tk.Toplevel):
         self.configure(bg="#F4F4F4")
 
         self.create_widgets()
+        self.load_types()
+        
         if self.mode == "edit" and self.partner_id:
             self.load_partner_data()
 
@@ -55,8 +75,7 @@ class PartnerEditWindow(tk.Toplevel):
         self.name_entry.pack(fill="x", pady=(2, 8))
 
         tk.Label(form, text="Тип партнера *", bg="#F4F4F4", font=("Segoe UI", 9, "bold")).pack(anchor="w")
-        self.type_combo = ttk.Combobox(form, values=["ЗАО", "ООО", "ПАО", "ОАО", "ИП"], state="readonly")
-        self.type_combo.current(1)
+        self.type_combo = ttk.Combobox(form, state="readonly")
         self.type_combo.pack(fill="x", pady=(2, 8))
 
         tk.Label(form, text="Рейтинг *", bg="#F4F4F4", font=("Segoe UI", 9, "bold")).pack(anchor="w")
@@ -82,9 +101,20 @@ class PartnerEditWindow(tk.Toplevel):
         tk.Button(btn_box, text="Сохранить", bg="#67BA80", fg="#FFFFFF", font=("Segoe UI", 10, "bold"), command=self.save_data).pack(side="left")
         tk.Button(btn_box, text="Отмена", bg="#FFFFFF", font=("Segoe UI", 10), command=self.destroy).pack(side="right")
 
+    def load_types(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, type_name FROM partner_types")
+        self.types_map = {row[1]: row[0] for row in cursor.fetchall()}
+        self.type_combo['values'] = list(self.types_map.keys())
+        if self.type_combo['values']:
+            self.type_combo.current(0)
+
     def load_partner_data(self):
         cursor = self.conn.cursor()
-        cursor.execute("SELECT type_name, name, director_name, email, phone, rating FROM partners WHERE id=?", (self.partner_id,))
+        cursor.execute("""
+            SELECT pt.type_name, p.name, p.director_name, p.email, p.phone, p.rating 
+            FROM partners p JOIN partner_types pt ON p.type_id = pt.id WHERE p.id=?
+        """, (self.partner_id,))
         row = cursor.fetchone()
         if row:
             self.type_combo.set(row[0])
@@ -96,22 +126,35 @@ class PartnerEditWindow(tk.Toplevel):
             self.rating_entry.insert(0, str(row[5]))
 
     def save_data(self):
-        cursor = self.conn.cursor()
-        if self.mode == "add":
-            cursor.execute("""
-                INSERT INTO partners (type_name, name, director_name, email, phone, rating)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (self.type_combo.get(), self.name_entry.get(), self.director_entry.get(), self.email_entry.get(), self.phone_entry.get(), int(self.rating_entry.get())))
-        else:
-            cursor.execute("""
-                UPDATE partners 
-                SET type_name=?, name=?, director_name=?, email=?, phone=?, rating=?
-                WHERE id=?
-            """, (self.type_combo.get(), self.name_entry.get(), self.director_entry.get(), self.email_entry.get(), self.phone_entry.get(), int(self.rating_entry.get()), self.partner_id))
-        
-        self.conn.commit()
-        self.parent.refresh_list()
-        self.destroy()
+        try:
+            type_name = self.type_combo.get()
+            type_id = self.types_map.get(type_name, 1)
+            name = self.name_entry.get().strip()
+            email = self.email_entry.get().strip()
+            phone = self.phone_entry.get().strip()
+            rating = int(self.rating_entry.get().strip())
+            
+            if not name or not email:
+                raise ValueError("Заполните обязательные поля!")
+
+            cursor = self.conn.cursor()
+            if self.mode == "add":
+                cursor.execute("""
+                    INSERT INTO partners (type_id, name, director_name, email, phone, rating)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (type_id, name, self.director_entry.get(), email, phone, rating))
+            else:
+                cursor.execute("""
+                    UPDATE partners 
+                    SET type_id=?, name=?, director_name=?, email=?, phone=?, rating=?
+                    WHERE id=?
+                """, (type_id, name, self.director_entry.get(), email, phone, rating, self.partner_id))
+            
+            self.conn.commit()
+            self.parent.refresh_list()
+            self.destroy()
+        except Exception as e:
+            tk.messagebox.showerror("Ошибка сохранения", f"Не удалось сохранить данные:\n{str(e)}")
 
 
 class MainWindow(tk.Tk):
@@ -137,7 +180,10 @@ class MainWindow(tk.Tk):
             widget.destroy()
 
         cursor = self.conn.cursor()
-        cursor.execute("SELECT id, type_name, name, director_name, phone, rating FROM partners ORDER BY id DESC")
+        cursor.execute("""
+            SELECT p.id, pt.type_name, p.name, p.director_name, p.phone, p.rating 
+            FROM partners p JOIN partner_types pt ON p.type_id = pt.id ORDER BY p.id DESC
+        """)
         rows = cursor.fetchall()
 
         for r in rows:
