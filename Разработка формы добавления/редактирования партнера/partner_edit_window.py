@@ -2,13 +2,39 @@ import tkinter as tk
 from tkinter import ttk
 
 
+class PlaceholderEntry(tk.Entry):
+    def __init__(self, container, placeholder, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.placeholder = placeholder
+        self.placeholder_color = '#888888'
+        self.default_fg_color = self['fg']
+
+        self.put_placeholder()
+        self.bind("<FocusIn>", self.focus_in)
+        self.bind("<FocusOut>", self.focus_out)
+
+    def put_placeholder(self):
+        if not self.get():
+            self.insert(0, self.placeholder)
+            self['fg'] = self.placeholder_color
+
+    def focus_in(self, *args):
+        if self['fg'] == self.placeholder_color:
+            self.delete('0', 'end')
+            self['fg'] = self.default_fg_color
+
+    def focus_out(self, *args):
+        if not self.get():
+            self.put_placeholder()
+
+
 class PartnerEditWindow(tk.Toplevel):
     def __init__(self, parent, mode="add"):
         super().__init__(parent)
         self.parent = parent
         self.mode = mode
         self.title("CRM: Карточка партнера [Добавление]" if mode == "add" else "CRM: Карточка партнера [Редактирование]")
-        self.geometry("520x620")
+        self.geometry("520x640")
         self.configure(bg="#F4F4F4")
         self.resizable(False, False)
 
@@ -22,10 +48,11 @@ class PartnerEditWindow(tk.Toplevel):
         form.pack(fill="both", expand=True)
 
         tk.Label(form, text="Наименование партнера *", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(5, 2))
-        self.name_entry = tk.Entry(form, font=("Segoe UI", 10), bd=1, relief="solid")
+        self.name_entry = PlaceholderEntry(form, "Например: ООО 'СтройМонтаж'", font=("Segoe UI", 10), bd=1, relief="solid")
         self.name_entry.pack(fill="x", ipady=4)
 
-        tk.Label(form, text="Тип партнера *", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(10, 2))
+        tk.Label(form, text="Тип партнера * (только выбор из списка)", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(10, 2))
+        # state="readonly" полностью исключает некорректный ручной ввод
         self.type_combo = ttk.Combobox(form, values=["ЗАО", "ООО", "ПАО", "ОАО", "ИП"], font=("Segoe UI", 10), state="readonly")
         self.type_combo.current(1)
         self.type_combo.pack(fill="x", ipady=3)
@@ -36,20 +63,19 @@ class PartnerEditWindow(tk.Toplevel):
         self.rating_entry.pack(fill="x", ipady=4)
 
         tk.Label(form, text="Юридический адрес", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(10, 2))
-        self.address_entry = tk.Entry(form, font=("Segoe UI", 10), bd=1, relief="solid")
+        self.address_entry = PlaceholderEntry(form, "г. Москва, ул. Примерная, д. 1", font=("Segoe UI", 10), bd=1, relief="solid")
         self.address_entry.pack(fill="x", ipady=4)
 
         tk.Label(form, text="ФИО директора", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(10, 2))
-        self.director_entry = tk.Entry(form, font=("Segoe UI", 10), bd=1, relief="solid")
+        self.director_entry = PlaceholderEntry(form, "Иванов Иван Иванович", font=("Segoe UI", 10), bd=1, relief="solid")
         self.director_entry.pack(fill="x", ipady=4)
 
-        tk.Label(form, text="Телефон (Формат: +7 XXX XXX-XX-XX) *", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(10, 2))
-        self.phone_entry = tk.Entry(form, font=("Segoe UI", 10), bd=1, relief="solid", fg="#888888")
-        self.phone_entry.insert(0, "+7 ")
+        tk.Label(form, text="Телефон *", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(10, 2))
+        self.phone_entry = PlaceholderEntry(form, "+7 (999) 000-00-00", font=("Segoe UI", 10), bd=1, relief="solid")
         self.phone_entry.pack(fill="x", ipady=4)
 
         tk.Label(form, text="Электронная почта (Email) *", font=("Segoe UI", 9, "bold"), bg="#F4F4F4").pack(anchor="w", pady=(10, 2))
-        self.email_entry = tk.Entry(form, font=("Segoe UI", 10), bd=1, relief="solid")
+        self.email_entry = PlaceholderEntry(form, "partner@company.ru", font=("Segoe UI", 10), bd=1, relief="solid")
         self.email_entry.pack(fill="x", ipady=4)
 
         btn_box = tk.Frame(self, bg="#F4F4F4", padx=25, pady=15)
