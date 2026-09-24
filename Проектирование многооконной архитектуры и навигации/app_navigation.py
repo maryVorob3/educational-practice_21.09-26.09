@@ -1,17 +1,18 @@
 import tkinter as tk
+from tkinter import ttk
 
 
 class PartnerEditWindow(tk.Toplevel):
     def __init__(self, parent, mode="add"):
         super().__init__(parent)
         self.parent = parent
-        if mode == "add":
-            self.title("CRM: Карточка партнера [Добавление]")
-        else:
-            self.title("CRM: Карточка партнера [Редактирование]")
+        self.title("CRM: Карточка партнера [Добавление]" if mode == "add" else "CRM: Карточка партнера [Редактирование]")
         self.geometry("500x550")
         self.configure(bg="#F4F4F4")
         self.resizable(False, False)
+
+        self.transient(parent)
+        self.grab_set()
 
         header = tk.Frame(self, bg="#FFFFFF", pady=12, padx=15, bd=1, relief="solid")
         header.pack(fill="x")
@@ -46,6 +47,7 @@ class MainWindow(tk.Tk):
         self.title("CRM: Реестр партнеров")
         self.geometry("750x550")
         self.configure(bg="#F4F4F4")
+        self.edit_window = None
 
         header = tk.Frame(self, bg="#FFFFFF", pady=15, padx=20, bd=1, relief="solid")
         header.pack(fill="x")
@@ -71,7 +73,11 @@ class MainWindow(tk.Tk):
         tk.Label(content, text="Список партнеров загружен. Нажмите кнопку выше для добавления.", font=("Segoe UI", 10), bg="#F4F4F4", fg="#666666").pack(anchor="w")
 
     def open_add_partner_window(self):
-        PartnerEditWindow(self, mode="add")
+        
+        if self.edit_window is None or not self.edit_window.winfo_exists():
+            self.edit_window = PartnerEditWindow(self, mode="add")
+        else:
+            self.edit_window.lift()
 
 
 if __name__ == "__main__":
